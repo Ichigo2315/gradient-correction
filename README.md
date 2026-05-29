@@ -42,7 +42,7 @@ AOT (Associating Objects with Transformers) [[1]](#参考文献) 是一种用于
 **DAVIS-2017 (Densely Annotated VIdeo Segmentation)** 是半监督视频目标分割领域最常用的基准数据集之一。其特点为：仅提供每个序列**第一帧**的真实掩码 (Ground-Truth) 作为输入，模型需在后续所有帧中分割并跟踪这些目标。本项目使用其480p版本。
 
 
-数据集目录（`aot-benchmark/datasets/DAVIS/`，原始 JPEG 帧因体积较大不纳入仓库，可从 [DAVIS 官网](https://davischallenge.org/davis2017/code.html) 下载）：
+数据集目录`aot-benchmark/datasets/DAVIS/`，原始 JPEG 帧因体积较大不纳入仓库，可从 [DAVIS 官网](https://davischallenge.org/davis2017/code.html) 下载：
 
 ```
 DAVIS/
@@ -75,12 +75,12 @@ gradient-correction/
 
 ### 开始编写视觉伺服模拟器
 
-模块二（视觉伺服模拟器）以 `servo_sim.py` 的 **code stub** 形式提供：文件中已写好全部函数/类的签名、数据契约与行为说明（docstring），但函数体均为 `raise NotImplementedError`，需要组员按注释填充实现。下面是从零开始的完整流程。
+模块二（视觉伺服模拟器）以 `servo_sim.py` 的 **code stub** 形式提供：文件中已写好全部函数/类的签名、数据契约与行为说明（docstring），但函数体均为 `raise NotImplementedError`，需要按注释填充实现。下面是从零开始的完整流程。
 
 #### 1. 克隆仓库
 
 ```bash
-git clone <本仓库地址> gradient-correction
+git clone https://github.com/Ichigo2315/gradient-correction.git
 cd gradient-correction
 ```
 
@@ -101,7 +101,7 @@ pip install numpy matplotlib pillow
 仓库中掩码以 zip 形式存放（PNG 数量过多），首次使用前需就地解压：
 
 ```powershell
-# DAVIS GT 真值标注 -> aot-benchmark/datasets/DAVIS/Annotations/480p/<seq>/*.png
+# DAVIS Ground Truth -> aot-benchmark/datasets/DAVIS/Annotations/480p/<seq>/*.png
 Expand-Archive aot-benchmark/datasets/DAVIS/Annotations.zip -DestinationPath aot-benchmark/datasets/DAVIS/
 
 # 预测掩码 -> aot-benchmark/results/davis2017/<run>/Annotations/480p/<seq>/*.png
@@ -135,9 +135,9 @@ python servo_sim.py all
 
 输出统一写入 `servo_eval/`（`car-roundabout/` 与 `all_sequences/`）。
 
-#### 6. 编写可视化脚本（开放，组员自行发挥）
+#### 6. 编写可视化脚本（自行发挥）
 
-最后一步**不提供 stub**，请组员基于 `servo_eval/` 中的产物自行设计可视化/报告脚本，例如：
+请基于 `servo_eval/all_sequences/` 中的产物自行设计可视化脚本，例如：
 
 - 输入：`servo_eval/all_sequences/per_sequence.csv`、`summary.json`、各序列 `metrics.json`
 - 可做：逐序列指标对比、AOT(ori) vs AOT+GC 胜率/箱线图、轨迹叠加动画、把质心轨迹回投到 JPEG 帧上的可视化等
