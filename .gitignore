@@ -1,0 +1,67 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+
+# ===== Editor / OS =====
+.DS_Store
+.vscode/
+Thumbs.db
+
+# ===== Scratch logs =====
+*.log
+full_eval_*.log
+terminals/
+
+# ===== Pytorch-Correlation-extension build artifacts =====
+Pytorch-Correlation-extension/build/
+Pytorch-Correlation-extension/*.egg-info/
+
+proposal/
+
+# ===========================================================================
+# DAVIS-2017 dataset
+#   Keep:   ground-truth annotations + ImageSets  (small, needed for J&F eval)
+#   Ignore: raw JPEG frames (~770MB, re-download from the official DAVIS site)
+#           and any dataset archive.
+# ===========================================================================
+aot-benchmark/datasets/DAVIS/JPEGImages/
+*.zip
+# GT annotations: 6208 PNGs -> tracked as a single zip (unzip in place to use).
+#   ImageSets (val.txt etc.) stays tracked as plain text.
+aot-benchmark/datasets/DAVIS/Annotations/
+!aot-benchmark/datasets/DAVIS/Annotations.zip
+
+# ===========================================================================
+# Inference outputs (predicted masks)
+#   Each run has ~2000 PNGs, too many to track raw -> upload as ZIP archives.
+#   Tracked zips:
+#     *_legacy20k1full_*  AOT+GC (legacy K=1, alpha=20; the +0.33 J&F run)
+#     *_noGCfull_*        AOT(ori) no-GC baseline (for the servo comparison)
+#   Reproduce by unzipping in place:
+#     results/davis2017/<run>/Annotations/480p/<seq>/*.png
+# ===========================================================================
+aot-benchmark/results/*
+!aot-benchmark/results/davis2017
+aot-benchmark/results/davis2017/*
+!aot-benchmark/results/davis2017/davis2017_val_legacy20k1full_AOTT_PRE_ckpt_unknown.zip
+!aot-benchmark/results/davis2017/davis2017_val_noGCfull_AOTT_PRE_ckpt_unknown.zip
+
+# Training-time scratch dirs (recreated on demand)
+aot-benchmark/result/
+aot-benchmark/img_logs/
+
+# ===========================================================================
+# Non-essential assets (not needed to run the pipeline)
+#   Upstream AOT demo media + reference papers — trim to keep the repo lean.
+# ===========================================================================
+aot-benchmark/source/
+aot-benchmark/datasets/Demo/
+*.pdf
+*.gif
+# keep our own course proposal PDF
+!proposal/main.pdf
+
