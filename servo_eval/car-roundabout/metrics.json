@@ -1,0 +1,24 @@
+{
+  "GT (DAVIS)": {
+    "tracking_rmse_px": 27.029438411424174,
+    "tracking_p99_px": 57.862737894377126,
+    "tracking_rmse_norm": 0.06756954159292054,
+    "tracking_p99_norm": 0.18558603079675642,
+    "control_energy": 572.9111534481294,
+    "centroid_jerk_rms": 3681.6872146809083,
+    "lock_loss_frames": 0,
+    "n_missing_frames": 0,
+    "n_total_frames": 75
+  },
+  "AOT+GC": {
+    "tracking_rmse_px": 25.507182325884532,
+    "tracking_p99_px": 46.99371979650144,
+    "tracking_rmse_norm": 0.0614430884057267,
+    "tracking_p99_norm": 0.15072756910301405,
+    "control_energy": 482.7352970623047,
+    "centroid_jerk_rms": 1540.919040119978,
+    "lock_loss_frames": 0,
+    "n_missing_frames": 0,
+    "n_total_frames": 75
+  }
+}

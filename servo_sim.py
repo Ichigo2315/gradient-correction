@@ -1,10 +1,9 @@
 """
-Visual-servoing evaluation harness for VOS masks  ***CODE STUB***.
+Visual-servoing evaluation harness for VOS masks.
 
-This file is an implementation stub: it specifies the public API (function and
-class signatures), the data contracts, and the expected behaviour via
-docstrings/comments only. Every body raises NotImplementedError. Fill them in to
-obtain a working `servo_sim.py`.
+This file was completed from an implementation stub that specifies the public
+API (function and class signatures), the data contracts, and the expected
+behaviour via docstrings/comments.
 
 -------------------------------------------------------------------------------
 What the finished script must do
@@ -72,7 +71,11 @@ def load_mask_sequence(mask_dir: Path) -> list[np.ndarray]:
     Returns one HxW uint8 array per frame, ordered by filename.
     Raise FileNotFoundError if the directory contains no .png files.
     """
-    raise NotImplementedError
+    mask_dir = Path(mask_dir)
+    png_files = sorted(mask_dir.glob("*.png"))
+    if not png_files:
+        raise FileNotFoundError(f"No PNG masks found in {mask_dir}")
+    return [np.asarray(Image.open(path), dtype=np.uint8) for path in png_files]
 
 
 def extract_centroid(mask: np.ndarray, obj_id: int = 1) -> np.ndarray | None:
@@ -80,7 +83,10 @@ def extract_centroid(mask: np.ndarray, obj_id: int = 1) -> np.ndarray | None:
 
     cx/cy are the mean column/row index of all pixels equal to `obj_id`.
     """
-    raise NotImplementedError
+    rows, cols = np.nonzero(mask == obj_id)
+    if rows.size == 0:
+        return None
+    return np.array([cols.mean(), rows.mean()], dtype=np.float64)
 
 
 def object_diag(mask: np.ndarray, obj_id: int = 1) -> float:
@@ -88,7 +94,12 @@ def object_diag(mask: np.ndarray, obj_id: int = 1) -> float:
 
     Return NaN if the object is absent in this frame.
     """
-    raise NotImplementedError
+    rows, cols = np.nonzero(mask == obj_id)
+    if rows.size == 0:
+        return float("nan")
+    width = cols.max() - cols.min() + 1
+    height = rows.max() - rows.min() + 1
+    return float(np.hypot(width, height))
 
 
 # ---------------------------------------------------------------------------
@@ -108,19 +119,38 @@ class KalmanCV2D:
 
     def __init__(self, dt: float, q: float, r: float, init_pos: np.ndarray):
         """Store dt and build x, P, F, H, Q, R per the class docstring."""
-        raise NotImplementedError
+        self.dt = float(dt)
+        self.x = np.array([init_pos[0], init_pos[1], 0.0, 0.0],
+                          dtype=np.float64)
+        self.P = 100.0 * np.eye(4, dtype=np.float64)
+        self.F = np.array([[1.0, 0.0, self.dt, 0.0],
+                           [0.0, 1.0, 0.0, self.dt],
+                           [0.0, 0.0, 1.0, 0.0],
+                           [0.0, 0.0, 0.0, 1.0]], dtype=np.float64)
+        self.H = np.array([[1.0, 0.0, 0.0, 0.0],
+                           [0.0, 1.0, 0.0, 0.0]], dtype=np.float64)
+        self.Q = float(q) * np.eye(4, dtype=np.float64)
+        self.R = float(r) * np.eye(2, dtype=np.float64)
 
     def predict(self) -> None:
         """Time update: x <- F x ; P <- F P F^T + Q."""
-        raise NotImplementedError
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
 
     def update(self, z: np.ndarray) -> None:
         """Measurement update with observation z = [cx, cy] (standard KF eqs)."""
-        raise NotImplementedError
+        innovation = np.asarray(z, dtype=np.float64) - self.H @ self.x
+        innovation_cov = self.H @ self.P @ self.H.T + self.R
+        gain = self.P @ self.H.T @ np.linalg.inv(innovation_cov)
+        self.x = self.x + gain @ innovation
+        self.P = (np.eye(4, dtype=np.float64) - gain @ self.H) @ self.P
 
     def step(self, z: np.ndarray | None) -> np.ndarray:
         """Run predict(), then update() iff z is not None; return a copy of x."""
-        raise NotImplementedError
+        self.predict()
+        if z is not None:
+            self.update(z)
+        return self.x.copy()
 
 
 # ---------------------------------------------------------------------------
@@ -133,14 +163,25 @@ class PID2D:
     def __init__(self, kp: float, ki: float, kd: float, dt: float,
                  u_max: float = 50.0):
         """Store gains/dt/u_max; zero-initialise the integral and prev-error."""
-        raise NotImplementedError
+        self.kp = float(kp)
+        self.ki = float(ki)
+        self.kd = float(kd)
+        self.dt = float(dt)
+        self.u_max = float(u_max)
+        self.integral = np.zeros(2, dtype=np.float64)
+        self.prev_error = np.zeros(2, dtype=np.float64)
 
     def __call__(self, e: np.ndarray) -> np.ndarray:
         """Return clipped u = kp*e + ki*integral(e) + kd*derivative(e).
 
         Update internal integral and previous-error state each call.
         """
-        raise NotImplementedError
+        e = np.asarray(e, dtype=np.float64)
+        self.integral += e * self.dt
+        derivative = (e - self.prev_error) / self.dt
+        self.prev_error = e.copy()
+        u = self.kp * e + self.ki * self.integral + self.kd * derivative
+        return np.clip(u, -self.u_max, self.u_max)
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +232,53 @@ def simulate(masks: list[np.ndarray], *, label: str, dt: float, target: np.ndarr
 
     Return a fully-populated RunLog (metrics left empty for compute_metrics).
     """
-    raise NotImplementedError
+    if not masks:
+        raise ValueError("Cannot simulate an empty mask sequence")
+    if gt_masks is not None and len(gt_masks) != len(masks):
+        raise ValueError("Mask sequence and GT sequence must have equal lengths")
+
+    observations = [extract_centroid(mask, obj_id) for mask in masks]
+    init_pos = next((z for z in observations if z is not None), None)
+    if init_pos is None:
+        raise RuntimeError(f"Object id {obj_id} never appears in {label}")
+
+    _ = target
+    n_frames = len(masks)
+    kalman = KalmanCV2D(dt, kalman_q, kalman_r, init_pos)
+    pid = PID2D(*pid_gains, dt)
+    cam_view = init_pos.copy()
+    z_log = np.full((n_frames, 2), np.nan, dtype=np.float64)
+    x_hat_log = np.empty((n_frames, 4), dtype=np.float64)
+    error_log = np.empty((n_frames, 2), dtype=np.float64)
+    control_log = np.empty((n_frames, 2), dtype=np.float64)
+    camera_log = np.empty((n_frames, 2), dtype=np.float64)
+    diag_log = np.full(n_frames, np.nan, dtype=np.float64)
+    missing = np.zeros(n_frames, dtype=bool)
+
+    for frame_idx, observation in enumerate(observations):
+        missing[frame_idx] = observation is None
+        if observation is not None:
+            z_log[frame_idx] = observation
+        state = kalman.step(observation)
+        error = state[:2] - cam_view
+        control = pid(error)
+        cam_view = cam_view + control * dt
+        x_hat_log[frame_idx] = state
+        error_log[frame_idx] = error
+        control_log[frame_idx] = control
+        camera_log[frame_idx] = cam_view
+        if gt_masks is not None:
+            diag_log[frame_idx] = object_diag(gt_masks[frame_idx], obj_id)
+
+    return RunLog(label=label,
+                  times=np.arange(n_frames, dtype=np.float64) * dt,
+                  z=z_log,
+                  x_hat=x_hat_log,
+                  e=error_log,
+                  u=control_log,
+                  cam=camera_log,
+                  obj_diag=diag_log,
+                  missing=missing)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +310,42 @@ def compute_metrics(log: RunLog, lock_thresh_frac: float = 0.5) -> dict:
 
     Also assign the dict to `log.metrics` and return it.
     """
-    raise NotImplementedError
+    err_pix = np.linalg.norm(log.e, axis=1)
+    valid_diag = np.isfinite(log.obj_diag) & (log.obj_diag > 0)
+    if np.any(valid_diag):
+        norm_error = err_pix[valid_diag] / log.obj_diag[valid_diag]
+        tracking_rmse_norm = float(np.sqrt(np.mean(norm_error ** 2)))
+        tracking_p99_norm = float(np.percentile(norm_error, 99))
+        lock_threshold = lock_thresh_frac * float(np.median(log.obj_diag[valid_diag]))
+        lock_loss_frames = int(np.count_nonzero(err_pix > lock_threshold))
+    else:
+        tracking_rmse_norm = float("nan")
+        tracking_p99_norm = float("nan")
+        lock_loss_frames = -1
+
+    if len(log.times) >= 4:
+        dt = float(log.times[1] - log.times[0])
+        velocity = np.gradient(log.x_hat[:, :2], dt, axis=0)
+        acceleration = np.gradient(velocity, dt, axis=0)
+        jerk = np.gradient(acceleration, dt, axis=0)
+        centroid_jerk_rms = float(np.sqrt(np.mean(np.sum(jerk ** 2, axis=1))))
+    else:
+        dt = 0.0 if len(log.times) < 2 else float(log.times[1] - log.times[0])
+        centroid_jerk_rms = float("nan")
+
+    metrics = {
+        "tracking_rmse_px": float(np.sqrt(np.mean(err_pix ** 2))),
+        "tracking_p99_px": float(np.percentile(err_pix, 99)),
+        "tracking_rmse_norm": tracking_rmse_norm,
+        "tracking_p99_norm": tracking_p99_norm,
+        "control_energy": float(np.sum(log.u ** 2) * dt),
+        "centroid_jerk_rms": centroid_jerk_rms,
+        "lock_loss_frames": lock_loss_frames,
+        "n_missing_frames": int(np.count_nonzero(log.missing)),
+        "n_total_frames": int(len(log.times)),
+    }
+    log.metrics = metrics
+    return metrics
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +368,81 @@ def plot_runs(logs: list[RunLog], out_dir: Path, target: np.ndarray,
 
     hw = (H, W) is the frame size; `target` is the image center marker.
     """
-    raise NotImplementedError
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+    for idx, log in enumerate(logs):
+        ax.plot(log.times, np.linalg.norm(log.e, axis=1),
+                color=PALETTE[idx % len(PALETTE)], label=log.label)
+    ax.set(xlabel="time [s]", ylabel="tracking error [px]",
+           title="Visual-servo tracking error")
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_dir / "tracking_error.png", dpi=150)
+    plt.close(fig)
+
+    height, width = hw
+    fig, ax = plt.subplots()
+    for idx, log in enumerate(logs):
+        color = PALETTE[idx % len(PALETTE)]
+        ax.plot(log.z[:, 0], log.z[:, 1], ":", color=color, alpha=0.45,
+                label=f"{log.label}: raw")
+        ax.plot(log.x_hat[:, 0], log.x_hat[:, 1], "-", color=color,
+                label=f"{log.label}: Kalman")
+        ax.plot(log.cam[:, 0], log.cam[:, 1], "--", color=color,
+                label=f"{log.label}: camera")
+        ax.plot(log.x_hat[0, 0], log.x_hat[0, 1], "s", color=color)
+        ax.plot(log.x_hat[-1, 0], log.x_hat[-1, 1], "^", color=color)
+    ax.plot([0, width, width, 0, 0], [0, 0, height, height, 0], "k-", lw=1)
+    ax.plot(target[0], target[1], "k*", markersize=12, label="image center")
+    ax.set(xlabel="x [px]", ylabel="y [px]", title="Centroid and camera trajectories")
+    ax.set_aspect("equal", adjustable="box")
+    points = np.concatenate([
+        path[np.all(np.isfinite(path), axis=1)]
+        for log in logs
+        for path in (log.z, log.x_hat[:, :2], log.cam)
+    ])
+    x_min, y_min = points.min(axis=0)
+    x_max, y_max = points.max(axis=0)
+    x_margin = max(10.0, 0.1 * (x_max - x_min))
+    y_margin = max(10.0, 0.1 * (y_max - y_min))
+    ax.set_xlim(x_min - x_margin, x_max + x_margin)
+    ax.set_ylim(y_min - y_margin, y_max + y_margin)
+    ax.invert_yaxis()
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig(out_dir / "trajectories.png", dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots()
+    for idx, log in enumerate(logs):
+        ax.plot(log.times, np.linalg.norm(log.u, axis=1),
+                color=PALETTE[idx % len(PALETTE)], label=log.label)
+    ax.set(xlabel="time [s]", ylabel="control magnitude",
+           title="PID control command")
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_dir / "control.png", dpi=150)
+    plt.close(fig)
+
+    x_positions = np.arange(len(METRIC_KEYS))
+    bar_width = 0.8 / len(logs)
+    fig, ax = plt.subplots()
+    for idx, log in enumerate(logs):
+        offset = (idx - (len(logs) - 1) / 2) * bar_width
+        values = [log.metrics[key] for key in METRIC_KEYS]
+        ax.bar(x_positions + offset, values, bar_width, label=log.label,
+               color=PALETTE[idx % len(PALETTE)])
+    ax.set_xticks(x_positions, [PRETTY[key] for key in METRIC_KEYS])
+    ax.set(title="Downstream servo metrics", ylabel="metric value")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_dir / "metrics_bar.png", dpi=150)
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +472,34 @@ def run_single(args: argparse.Namespace) -> None:
     Expected args: mask_dir, label, obj_id, fps, kalman_q, pid, out_dir,
     kalman_r_gt, kalman_r_pred.
     """
-    raise NotImplementedError
+    mask_dirs = args.mask_dir or [DEFAULT_GT, DEFAULT_PRD]
+    labels = args.label or ["GT (DAVIS)", "AOT+GC"]
+    if len(mask_dirs) != len(labels):
+        raise ValueError("Provide exactly one --label for each --mask-dir")
+
+    mask_dirs = [ROOT / path for path in mask_dirs]
+    gt_masks = load_mask_sequence(mask_dirs[0])
+    height, width = gt_masks[0].shape
+    target = np.array([width / 2.0, height / 2.0], dtype=np.float64)
+    dt = 1.0 / args.fps
+    logs = []
+
+    for mask_dir, label in zip(mask_dirs, labels):
+        masks = load_mask_sequence(mask_dir)
+        kalman_r = args.kalman_r_gt if label.lower().startswith("gt") else args.kalman_r_pred
+        log = simulate(masks, label=label, dt=dt, target=target,
+                       kalman_r=kalman_r, kalman_q=args.kalman_q,
+                       pid_gains=tuple(args.pid), obj_id=args.obj_id,
+                       gt_masks=gt_masks)
+        metrics = compute_metrics(log)
+        logs.append(log)
+        print(f"\n{label}")
+        print(json.dumps(metrics, indent=2))
+
+    out_dir = ROOT / args.out_dir
+    plot_runs(logs, out_dir, target, (height, width))
+    with (out_dir / "metrics.json").open("w", encoding="utf-8") as file:
+        json.dump({log.label: log.metrics for log in logs}, file, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -292,11 +515,14 @@ METHODS = {
     "AOT+GC": ROOT / "aot-benchmark/results/davis2017/"
     "davis2017_val_legacy20k1full_AOTT_PRE_ckpt_unknown/Annotations/480p/{seq}",
 }
+# lab-coat's ids 1 and 2 are tiny regions that disappear almost immediately in
+# the predictions. Track one of its three persistent person masks instead.
+OBJECT_ID_OVERRIDES = {"lab-coat": 3}
 
 
 def _path(tpl: Path, seq: str) -> Path:
     """Substitute `{seq}` into a path template and return a Path."""
-    raise NotImplementedError
+    return Path(str(tpl).format(seq=seq))
 
 
 def run_all(args: argparse.Namespace) -> None:
@@ -309,7 +535,8 @@ def run_all(args: argparse.Namespace) -> None:
           in METHODS: load masks, simulate() with kalman_r=args.kalman_r and the
           GT masks as normalization, compute_metrics(); collect a row
           {sequence, method, <METRIC_KEYS>}. Record skips for missing dirs/errors.
-        * Write per_sequence.csv (columns: sequence, method, *METRIC_KEYS).
+        * Write per_sequence.csv (metrics + missing-frame columns) and a compact
+          missing_frames.csv with one row per sequence.
         * Compute, in summary.json:
             - means          : per-method mean of each metric over all sequences
             - win_vs_AOT_ori : per-metric count of seqs where AOT+GC < / == / >
@@ -321,7 +548,133 @@ def run_all(args: argparse.Namespace) -> None:
 
     Expected args: val_list, out_dir, obj_id, fps, kalman_q, pid, kalman_r.
     """
-    raise NotImplementedError
+    val_list = Path(args.val_list)
+    sequences = [line.strip() for line in val_list.read_text(encoding="utf-8").splitlines()
+                 if line.strip()]
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dt = 1.0 / args.fps
+    rows = []
+    skipped = []
+
+    for seq in sequences:
+        try:
+            gt_masks = load_mask_sequence(_path(GT_TPL, seq))
+            height, width = gt_masks[0].shape
+            target = np.array([width / 2.0, height / 2.0], dtype=np.float64)
+            obj_id = OBJECT_ID_OVERRIDES.get(seq, args.obj_id)
+            sequence_rows = []
+            for label, template in METHODS.items():
+                masks = load_mask_sequence(_path(template, seq))
+                log = simulate(masks, label=label, dt=dt, target=target,
+                               kalman_r=args.kalman_r, kalman_q=args.kalman_q,
+                               pid_gains=tuple(args.pid), obj_id=obj_id,
+                               gt_masks=gt_masks)
+                metrics = compute_metrics(log)
+                sequence_rows.append({
+                    "sequence": seq,
+                    "selected_obj_id": obj_id,
+                    "method": label,
+                    **{key: metrics[key] for key in METRIC_KEYS},
+                    "n_missing_frames": metrics["n_missing_frames"],
+                    "n_total_frames": metrics["n_total_frames"],
+                    "missing_rate": metrics["n_missing_frames"] / metrics["n_total_frames"],
+                })
+            rows.extend(sequence_rows)
+        except (FileNotFoundError, RuntimeError, ValueError) as error:
+            skipped.append({"sequence": seq, "reason": str(error)})
+            print(f"Skipping {seq}: {error}")
+
+    fieldnames = ["sequence", "selected_obj_id", "method", *METRIC_KEYS,
+                  "n_missing_frames", "n_total_frames", "missing_rate"]
+    with (out_dir / "per_sequence.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    means = {}
+    for label in METHODS:
+        method_rows = [row for row in rows if row["method"] == label]
+        means[label] = {
+            key: float(np.mean([row[key] for row in method_rows]))
+            if method_rows else float("nan")
+            for key in METRIC_KEYS
+        }
+
+    paired = {}
+    for row in rows:
+        paired.setdefault(row["sequence"], {})[row["method"]] = row
+
+    missing_fieldnames = ["sequence", "selected_obj_id",
+                          "AOT(ori)_missing_frames", "AOT+GC_missing_frames",
+                          "n_total_frames"]
+    with (out_dir / "missing_frames.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=missing_fieldnames)
+        writer.writeheader()
+        for seq, seq_rows in paired.items():
+            writer.writerow({
+                "sequence": seq,
+                "selected_obj_id": seq_rows["AOT(ori)"]["selected_obj_id"],
+                "AOT(ori)_missing_frames": seq_rows["AOT(ori)"]["n_missing_frames"],
+                "AOT+GC_missing_frames": seq_rows["AOT+GC"]["n_missing_frames"],
+                "n_total_frames": seq_rows["AOT(ori)"]["n_total_frames"],
+            })
+
+    win_counts = {}
+    for key in METRIC_KEYS:
+        counts = {"better": 0, "equal": 0, "worse": 0}
+        for seq_rows in paired.values():
+            if set(METHODS).issubset(seq_rows):
+                gc_value = seq_rows["AOT+GC"][key]
+                baseline_value = seq_rows["AOT(ori)"][key]
+                if np.isclose(gc_value, baseline_value):
+                    counts["equal"] += 1
+                elif gc_value < baseline_value:
+                    counts["better"] += 1
+                else:
+                    counts["worse"] += 1
+        win_counts[key] = counts
+
+    summary = {
+        "means": means,
+        "win_vs_AOT_ori": win_counts,
+        "missing_frames_by_sequence": {
+            seq: {
+                row["method"]: {
+                    "selected_obj_id": row["selected_obj_id"],
+                    "n_missing_frames": row["n_missing_frames"],
+                    "n_total_frames": row["n_total_frames"],
+                    "missing_rate": row["missing_rate"],
+                }
+                for row in seq_rows.values()
+            }
+            for seq, seq_rows in paired.items()
+        },
+        "skipped": skipped,
+        "n_total_seqs": len(sequences),
+    }
+    with (out_dir / "summary.json").open("w", encoding="utf-8") as file:
+        json.dump(summary, file, indent=2)
+
+    x_positions = np.arange(len(METRIC_KEYS))
+    bar_width = 0.35
+    fig, ax = plt.subplots()
+    for idx, label in enumerate(METHODS):
+        offset = (idx - 0.5) * bar_width
+        ax.bar(x_positions + offset, [means[label][key] for key in METRIC_KEYS],
+               bar_width, label=label, color=PALETTE[idx])
+    ax.set_xticks(x_positions, [PRETTY[key] for key in METRIC_KEYS])
+    ax.set(title="DAVIS-2017 val mean servo metrics", ylabel="mean metric value")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_dir / "summary_bar.png", dpi=150)
+    plt.close(fig)
+
+    print("\nDAVIS-2017 val mean servo metrics")
+    print("method\t" + "\t".join(METRIC_KEYS))
+    for label in METHODS:
+        values = "\t".join(f"{means[label][key]:.6g}" for key in METRIC_KEYS)
+        print(f"{label}\t{values}")
 
 
 # ---------------------------------------------------------------------------
@@ -352,12 +705,40 @@ def build_parser() -> argparse.ArgumentParser:
 
     The selected sub-command must set `func` so that main() can dispatch.
     """
-    raise NotImplementedError
+    parser = argparse.ArgumentParser(description="Visual-servoing evaluation for VOS masks")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    def add_shared_options(subparser: argparse.ArgumentParser) -> None:
+        subparser.add_argument("--obj-id", type=int, default=1)
+        subparser.add_argument("--fps", type=float, default=24.0)
+        subparser.add_argument("--kalman-q", type=float, default=1.0)
+        subparser.add_argument("--pid", type=float, nargs=3, metavar=("KP", "KI", "KD"),
+                               default=(0.45, 0.0, 0.05))
+
+    single = subparsers.add_parser("single", help="run one sequence")
+    add_shared_options(single)
+    single.add_argument("--mask-dir", action="append")
+    single.add_argument("--label", action="append")
+    single.add_argument("--out-dir", default="servo_eval/car-roundabout")
+    single.add_argument("--kalman-r-gt", type=float, default=1.0)
+    single.add_argument("--kalman-r-pred", type=float, default=25.0)
+    single.set_defaults(func=run_single)
+
+    all_sequences = subparsers.add_parser("all", help="run DAVIS-2017 val")
+    add_shared_options(all_sequences)
+    all_sequences.add_argument(
+        "--val-list",
+        default=ROOT / "aot-benchmark/datasets/DAVIS/ImageSets/2017/val.txt")
+    all_sequences.add_argument("--out-dir", default=ROOT / "servo_eval/all_sequences")
+    all_sequences.add_argument("--kalman-r", type=float, default=25.0)
+    all_sequences.set_defaults(func=run_all)
+    return parser
 
 
 def main() -> None:
     """Parse args and dispatch to the selected sub-command's `func`."""
-    raise NotImplementedError
+    args = build_parser().parse_args()
+    args.func(args)
 
 
 if __name__ == "__main__":

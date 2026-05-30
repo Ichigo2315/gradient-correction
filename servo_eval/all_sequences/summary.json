@@ -1,0 +1,462 @@
+{
+  "means": {
+    "AOT(ori)": {
+      "tracking_rmse_px": 89.21799732771521,
+      "tracking_p99_px": 156.61050800080076,
+      "centroid_jerk_rms": 11590.959910788208,
+      "control_energy": 3310.2912734025576
+    },
+    "AOT+GC": {
+      "tracking_rmse_px": 89.19577285850916,
+      "tracking_p99_px": 156.55304530880133,
+      "centroid_jerk_rms": 11591.216918745968,
+      "control_energy": 3309.867531524322
+    }
+  },
+  "win_vs_AOT_ori": {
+    "tracking_rmse_px": {
+      "better": 20,
+      "equal": 5,
+      "worse": 5
+    },
+    "tracking_p99_px": {
+      "better": 20,
+      "equal": 3,
+      "worse": 7
+    },
+    "centroid_jerk_rms": {
+      "better": 15,
+      "equal": 1,
+      "worse": 14
+    },
+    "control_energy": {
+      "better": 19,
+      "equal": 6,
+      "worse": 5
+    }
+  },
+  "missing_frames_by_sequence": {
+    "bike-packing": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 69,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 69,
+        "missing_rate": 0.0
+      }
+    },
+    "blackswan": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      }
+    },
+    "bmx-trees": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 80,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 80,
+        "missing_rate": 0.0
+      }
+    },
+    "breakdance": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 84,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 84,
+        "missing_rate": 0.0
+      }
+    },
+    "camel": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 90,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 90,
+        "missing_rate": 0.0
+      }
+    },
+    "car-roundabout": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 75,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 75,
+        "missing_rate": 0.0
+      }
+    },
+    "car-shadow": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 40,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 40,
+        "missing_rate": 0.0
+      }
+    },
+    "cows": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 104,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 104,
+        "missing_rate": 0.0
+      }
+    },
+    "dance-twirl": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 90,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 90,
+        "missing_rate": 0.0
+      }
+    },
+    "dog": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 60,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 60,
+        "missing_rate": 0.0
+      }
+    },
+    "dogs-jump": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 66,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 66,
+        "missing_rate": 0.0
+      }
+    },
+    "drift-chicane": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 52,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 52,
+        "missing_rate": 0.0
+      }
+    },
+    "drift-straight": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      }
+    },
+    "goat": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 90,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 90,
+        "missing_rate": 0.0
+      }
+    },
+    "gold-fish": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 78,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 78,
+        "missing_rate": 0.0
+      }
+    },
+    "horsejump-high": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      }
+    },
+    "india": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 13,
+        "n_total_frames": 81,
+        "missing_rate": 0.16049382716049382
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 13,
+        "n_total_frames": 81,
+        "missing_rate": 0.16049382716049382
+      }
+    },
+    "judo": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 34,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 34,
+        "missing_rate": 0.0
+      }
+    },
+    "kite-surf": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      }
+    },
+    "lab-coat": {
+      "AOT(ori)": {
+        "selected_obj_id": 3,
+        "n_missing_frames": 0,
+        "n_total_frames": 47,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 3,
+        "n_missing_frames": 0,
+        "n_total_frames": 47,
+        "missing_rate": 0.0
+      }
+    },
+    "libby": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 49,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 49,
+        "missing_rate": 0.0
+      }
+    },
+    "loading": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 50,
+        "missing_rate": 0.0
+      }
+    },
+    "mbike-trick": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 79,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 79,
+        "missing_rate": 0.0
+      }
+    },
+    "motocross-jump": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 40,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 40,
+        "missing_rate": 0.0
+      }
+    },
+    "paragliding-launch": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 80,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 80,
+        "missing_rate": 0.0
+      }
+    },
+    "parkour": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 100,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 100,
+        "missing_rate": 0.0
+      }
+    },
+    "pigs": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 79,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 79,
+        "missing_rate": 0.0
+      }
+    },
+    "scooter-black": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 43,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 43,
+        "missing_rate": 0.0
+      }
+    },
+    "shooting": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 40,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 40,
+        "missing_rate": 0.0
+      }
+    },
+    "soapbox": {
+      "AOT(ori)": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 99,
+        "missing_rate": 0.0
+      },
+      "AOT+GC": {
+        "selected_obj_id": 1,
+        "n_missing_frames": 0,
+        "n_total_frames": 99,
+        "missing_rate": 0.0
+      }
+    }
+  },
+  "skipped": [],
+  "n_total_seqs": 30
+}
