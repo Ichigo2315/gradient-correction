@@ -65,3 +65,5 @@ aot-benchmark/datasets/Demo/
 # keep our own course proposal PDF
 !proposal/main.pdf
 
+servo_eval/visualizations/*.png
+

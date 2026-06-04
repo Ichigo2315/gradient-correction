@@ -1,0 +1,7 @@
+metric,win_rate_percent
+tracking_rmse_px,76.66666666666667
+tracking_p99_px,66.66666666666666
+centroid_jerk_rms,50.0
+control_energy,83.33333333333334
+n_missing_frames,0.0
+missing_rate,0.0
