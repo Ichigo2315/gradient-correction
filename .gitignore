@@ -20,7 +20,10 @@ terminals/
 Pytorch-Correlation-extension/build/
 Pytorch-Correlation-extension/*.egg-info/
 
-proposal/
+report/*.aux
+report/*.pdf
+report/*.log
+report/*.out
 
 # ===========================================================================
 # DAVIS-2017 dataset

@@ -1,0 +1,177 @@
+\documentclass{article}
+
+
+\PassOptionsToPackage{numbers,compress}{natbib}
+
+
+% ready for submission
+\usepackage[preprint]{neurips_2026}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{amsmath}
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\newcommand{\new}[1]{{\color{red} #1}}
+
+
+\title{ECE228 Project Proposal:\\
+Refining Video Object Segmentation with Test-time Gradient Correction}
+
+
+\author{%
+  Suyu Chen \\
+  \texttt{suc033@ucsd.edu}
+  \And
+  Yi Sun \\
+  \texttt{yis094@ucsd.edu}
+  \And
+  Yinru Chen\\
+  \texttt{yic173@ucsd.edu}
+  \AND
+  \textbf{Group \#71}
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\section{Problem Background \& Motivation}
+
+Semi-supervised video object segmentation (VOS) models~\citep{pont2017davis}, such as STM~\citep{oh2019stm} and AOT~\citep{yang2021aot}, predict target masks across video sequences given a first-frame annotation. Currently, state-of-the-art pipelines are evaluated predominantly by per-frame spatial overlap ($\mathcal{J}\&\mathcal{F}$). This metric, however, is blind to temporal consistency: a temporally jittery mask scores similarly to a smooth one. In physical robotics applications like visual servoing~\citep{chaumette2006visual}, this high-frequency perception noise is disastrous, translating directly into physical actuator jerk, wasted control energy, and tracking lock-loss.
+
+To bridge the gap between perception quality and physical control stability, we optimize VOS models via \emph{test-time gradient correction}~\citep{li2020cycle}. At inference time, this technique uses the first-frame ground truth as an anchor, iteratively refining the current frame's prediction through gradient descent on a cycle-consistency loss back to frame $1$.
+
+In this project, we apply test-time gradient correction to optimize the AOT~\citep{yang2021aot} pipeline. Crucially, we evaluate the system not just on standard VOS metrics, but within a simulated closed-loop visual-servoing environment to determine if this optimization yields measurable stability improvements in physical tracking tasks.
+
+\section{Related Work}
+
+\paragraph{Memory-based VOS architectures.}
+The dominant family for semi-supervised VOS uses an external memory of
+past frame--mask pairs and attention-based matching.
+STM~\citep{oh2019stm} introduced this paradigm; AOT~\citep{yang2021aot}
+added an identification mechanism that processes multiple objects in a
+single forward pass; DeAOT~\citep{yang2022deaot} decoupled visual and
+ID features for hierarchical propagation, and
+XMem~\citep{cheng2022xmem} added a long-term memory pool for
+minute-long videos.  All four operate purely \emph{offline} at
+inference, leaving room for test-time refinement.
+
+\paragraph{Test-time refinement and cycle consistency in VOS.}
+Online-learning approaches such as OnAVOS~\citep{voigtlaender2017onavos}
+fine-tune network weights on the first frame; they are accurate but
+prohibitively slow ($<\!1$ FPS).  \citet{li2020cycle} instead use the
+first-frame ground-truth mask as a self-supervisory anchor and apply
+\emph{gradient correction}: a few PGD-style updates of the predicted
+mask along the gradient of a cycle-consistency loss
+$\mathcal{L}\bigl(S_\theta(X_t,\hat Y^{l}_t,X_1),Y_1\bigr)$.  Cycle
+consistency has a long history in image translation, but
+\citet{li2020cycle} is to our knowledge the only work that uses it as a
+test-time \emph{control signal} for VOS.  Our project sits in this
+thread but re-evaluates the technique through a control-theoretic lens.
+
+\paragraph{Perception for visual servoing.}
+Classical image-based visual servoing (IBVS)~\citep{chaumette2006visual}
+reduces tracking control to driving a per-frame feature error to zero.
+Modern systems typically plug in a bounding-box deep tracker, not
+pixel-precise VOS, and seldom analyse how perception errors propagate
+into control errors.  We use IBVS as a downstream evaluation harness
+for VOS, which has not been done in the gradient-correction literature.
+
+\section{High-level Methodology}
+
+\paragraph{Step 1 -- Reproduce and audit.}
+We reproduce the public AOT $+$ gradient-correction pipeline on the
+DAVIS-2017 validation split and audit it against \citet{li2020cycle}
+Eq.~(5), resulting J and F scores may act as indicators of the correctness of our implementation.
+
+\paragraph{Step 2 -- Improvements.}
+We then explore improvements on the corrected baseline:
+
+\textbf{(I-1)} restore an end-to-end differentiable cycle by removing
+the detach calls and using a straight-through estimator through the
+$\arg\max$;
+
+\textbf{(I-2)} introduce a \emph{multi-anchor} cycle that,
+in addition to $Y_1$, uses a small set of high-confidence intermediate
+predictions as auxiliary anchors to reduce appearance drift on long
+sequences.
+
+\paragraph{Step 3 -- Visual-servoing evaluation.}
+Each predicted mask sequence is fed into a closed-loop simulator that
+extracts the per-object centroid, smooths it through a 2-D
+constant-velocity Kalman filter, and uses a discrete PID controller to
+drive a virtual pan--tilt camera toward the centroid.
+
+Because the harness's discriminative power depends on scene dynamics,
+we stratify across four DAVIS buckets --- single-target with
+distractors (\texttt{car-roundabout}), multi-target
+(\texttt{bike-packing}, \texttt{cows}), high-dynamics
+(\texttt{motocross-jump}) and long-drift (\texttt{breakdance}). 
+
+\paragraph{Risks.}
+If controller-level deltas turn out small once the implementation is
+fixed, the project still delivers a controlled negative result, an
+audited reference implementation, and an open-source evaluation
+harness.
+
+\bibliographystyle{plainnat}
+{\footnotesize
+\setlength{\bibsep}{0pt plus 0.2ex}
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[Chaumette and Hutchinson(2006)]{chaumette2006visual}
+F.~Chaumette and S.~Hutchinson.
+\newblock Visual servo control. {I}. {B}asic approaches.
+\newblock \emph{IEEE Robotics \& Automation Magazine}, 13(4):82--90, 2006.
+
+\bibitem[Cheng and Schwing(2022)]{cheng2022xmem}
+H.~K. Cheng and A.~G. Schwing.
+\newblock {XM}em: Long-term video object segmentation with an {A}tkinson--{S}hiffrin memory model.
+\newblock In \emph{ECCV}, 2022.
+
+\bibitem[Li et~al.(2020)Li, Xu, Peng, See, and Lin]{li2020cycle}
+Y.~Li, N.~Xu, J.~Peng, J.~See, and W.~Lin.
+\newblock Delving into the cyclic mechanism in semi-supervised video object segmentation.
+\newblock In \emph{NeurIPS}, 2020.
+
+\bibitem[Oh et~al.(2019)Oh, Lee, Xu, and Kim]{oh2019stm}
+S.~W. Oh, J.-Y. Lee, N.~Xu, and S.~J. Kim.
+\newblock Video object segmentation using space-time memory networks.
+\newblock In \emph{ICCV}, 2019.
+
+\bibitem[Pont-Tuset et~al.(2017)]{pont2017davis}
+J.~Pont-Tuset, F.~Perazzi, S.~Caelles, P.~Arbel\'aez, A.~Sorkine-Hornung, and L.~Van~Gool.
+\newblock The 2017 {DAVIS} challenge on video object segmentation.
+\newblock \emph{arXiv:1704.00675}, 2017.
+
+\bibitem[Voigtlaender and Leibe(2017)]{voigtlaender2017onavos}
+P.~Voigtlaender and B.~Leibe.
+\newblock Online adaptation of convolutional neural networks for video object segmentation.
+\newblock In \emph{BMVC}, 2017.
+
+\bibitem[Yang et~al.(2021)Yang, Wei, and Yang]{yang2021aot}
+Z.~Yang, Y.~Wei, and Y.~Yang.
+\newblock Associating objects with transformers for video object segmentation.
+\newblock In \emph{NeurIPS}, 2021.
+
+\bibitem[Yang and Yang(2022)]{yang2022deaot}
+Z.~Yang and Y.~Yang.
+\newblock Decoupling features in hierarchical propagation for video object segmentation.
+\newblock In \emph{NeurIPS}, 2022.
+
+\end{thebibliography}
+}
+
+
+\end{document}

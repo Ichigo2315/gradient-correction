@@ -1,152 +1,179 @@
-# ECE 228(SP26) Final Project
+# ECE 228 (SP26) Final Project
 ## Refining Video Object Segmentation with Test-time Gradient Correction
 
-AOT (Associating Objects with Transformers) [[1]](#参考文献) 是一种用于视频目标分割(Video Object Segmentation, VOS)的模型。原论文中，用于模型输出质量的指标有两个，F分数和J分数：**J分数 (Jaccard Index)** 衡量区域相似度，计算预测掩码与真实掩码的交并比 (IoU)；**F分数 (Boundary F-measure)** 衡量边界准确度，基于预测掩码边界与真实掩码边界的精确率 (Precision) 和召回率 (Recall) 计算调和平均数。
+**English** | [中文](README.zh.md)
 
-本项目通过引入推理时的**梯度校正（Gradient Correction / GC）** [[2]](#参考文献) 来优化输出掩码质量，并搭建**视觉伺服模拟器**来验证这种优化对物理控制带来的实际提升。
+AOT (Associating Objects with Transformers) [[1]](#references) is a semi-supervised Video Object Segmentation (VOS) model that segments and tracks objects in a video given only the mask of the first frame. Output quality is measured with two metrics: the **J score (Jaccard Index)** measures region similarity as the Intersection-over-Union (IoU) between the predicted and ground-truth masks; the **F score (Boundary F-measure)** measures contour accuracy as the harmonic mean of boundary precision and recall.
 
----
-
-### 核心任务
-
-#### 1. 应用梯度校正（已完成）
-
-核心任务：复现Yuxi Li等人提出的梯度校正方法，输出高质量的 Mask
-
-1. 复现 AOT Baseline：运行 AOT 在 DAVIS2017数据集上的训练->测试流程，获取基础的预测掩码。
-2. 引入梯度校正 (Gradient Correction)：
-   - 将视频第一帧的 Ground-Truth (真实掩码) 作为锚点。
-   - 在推理阶段，利用循环一致性损失计算梯度。
-   - 通过梯度下降对当前帧的预测掩码进行校正。
-3. 输出结果：得到优化后预测掩码。
-
-#### 2. 视觉伺服模拟器
-
-核心任务：搭建模拟器，验证掩码质量对控制轨迹和指标的影响**
-
-1. 搭建模拟器：构建一个基于图像的视觉伺服闭环仿真环境。
-2. 轨迹计算：
-   - 接收模块一生成的 **Pred Mask**（预测掩码）和 **Ground-Truth Mask**（真实掩码）。
-   - 提取目标的质心，并使用卡尔曼滤波器（Kalman Filter）进行平滑处理。
-   - 将处理后的信号输入 PID 控制器，模拟虚拟云台相机追踪该目标的运动轨迹。
-3. 计算物理控制指标：
-   - 对比“原生 AOT 掩码”与“梯度校正后掩码”在控制端的表现。
-   - 核心指标：**追踪误差 (Tracking Error)**、**控制能耗/平滑度 (Control Energy/Jerk)** 以及是否发生目标丢失 (Lock-loss)。
+This project improves the output mask quality with test-time **Gradient Correction (GC)** [[2]](#references), and builds a **visual servoing simulator** to verify the practical benefit of this refinement for downstream physical control.
 
 ---
 
-### 数据集及项目结构
+### Key Contributions
 
-我们使用 `DAVIS-2017` 数据集的验证集 (val) 完成全部实验。
+#### 1. Test-time Gradient Correction
 
-**DAVIS-2017 (Densely Annotated VIdeo Segmentation)** 是半监督视频目标分割领域最常用的基准数据集之一。其特点为：仅提供每个序列**第一帧**的真实掩码 (Ground-Truth) 作为输入，模型需在后续所有帧中分割并跟踪这些目标。本项目使用其480p版本。
+Core task: reproduce the gradient-correction method of Yuxi Li et al. to produce higher-quality masks.
 
+1. Reproduce the AOT baseline: run AOT's train→test pipeline on DAVIS-2017 to obtain the base predicted masks.
+2. Introduce Gradient Correction:
+   - Use the first-frame Ground-Truth mask as the anchor.
+   - At inference time, compute gradients from a cycle-consistency loss.
+   - Refine the current-frame predicted mask via gradient descent.
+3. Output: the refined predicted masks.
 
-数据集目录`aot-benchmark/datasets/DAVIS/`，原始 JPEG 帧因体积较大不纳入仓库，可从 [DAVIS 官网](https://davischallenge.org/davis2017/code.html) 下载：
+#### 2. Visual Servoing Simulator
+
+Core task: build a simulator to verify how mask quality affects control trajectories and metrics.
+
+1. Build a closed-loop, image-based visual servoing simulation.
+2. Trajectory computation:
+   - Take the **Pred Mask** (predicted) and **Ground-Truth Mask** from Module 1.
+   - Extract the object centroid and smooth it with a Kalman filter.
+   - Feed the processed signal into a PID controller that drives a virtual pan/tilt camera to track the object.
+3. Physical control metrics:
+   - Compare "native AOT mask" vs. "gradient-corrected mask" at the control side.
+   - Key metrics: **Tracking Error**, **Control Energy / Jerk (smoothness)**, and **Lock-loss**.
+
+---
+
+### Dataset & Project Structure
+
+All experiments use the validation set (val) of the `DAVIS-2017` dataset.
+
+**DAVIS-2017 (Densely Annotated VIdeo Segmentation)** is one of the most widely used benchmarks for semi-supervised VOS. It provides the Ground-Truth mask of only the **first frame** of each sequence as input; the model must segment and track those objects across all subsequent frames. We use the 480p version.
+
+The dataset lives in `aot-benchmark/datasets/DAVIS/`. The raw JPEG frames are large and are not committed; download them from the [DAVIS website](https://davischallenge.org/davis2017/code.html):
 
 ```
 DAVIS/
-├── JPEGImages/480p/<seq>/*.jpg     # 视频帧（输入，未入库，需自行下载）
-├── Annotations/480p/<seq>/*.png    # 真实掩码 GT（入库保留）
-└── ImageSets/2017/val.txt          # val 子集 30 个序列名
+├── JPEGImages/480p/<seq>/*.jpg     # video frames (input, not committed, download yourself)
+├── Annotations/480p/<seq>/*.png    # Ground-Truth masks (committed)
+└── ImageSets/2017/val.txt          # the 30 sequence names of the val subset
 ```
 
-整体项目结构：
+Overall project structure:
 
 ```
 gradient-correction/
 ├── aot-benchmark/        
-│   ├── networks/managers/evaluator.py    # 推理 + 梯度校正
+│   ├── networks/managers/evaluator.py    # inference + gradient correction
 │   ├── tools/eval.py                     
-│   ├── configs/                          # 配置（含梯度校正超参数）
-│   ├── pretrain_models/                  # 预训练权重
-│   └── results/davis2017/                # 预测掩码 (Pred Mask)，以 zip 提供（~2000 PNG/run，需解压到同名目录）
+│   ├── configs/                          # configs (incl. GC hyper-parameters)
+│   ├── pretrain_models/                  # pretrained weights
+│   └── results/davis2017/                # predicted masks (Pred Mask), shipped as zip (~2000 PNG/run, unzip in place)
 │       ├── ..._noGCfull_....zip      # AOT(original)
 │       └── ..._legacy20k1full_....zip# AOT+GC (K=1, α=20)
-├── davis2017-evaluation/          # 官方 J&F 评测工具包
-├── servo_sim.py                   # 视觉伺服仿真（code stub，待实现：single / all 子命令）
-├── servo_eval/                    # 伺服仿真结果（图 + 指标）
-│   ├── car-roundabout/            # 单序列示例输出
-│   └── all_sequences/            # 全序列聚合（CSV / JSON / 图）
-└── run_official_eval.py           # 评测入口脚本
+├── davis2017-evaluation/          # official J&F evaluation toolkit
+├── servo_sim.py                   # visual servoing simulator (code stub: single / all subcommands)
+├── servo_eval/                    # servo simulation outputs (figures + metrics)
+│   ├── car-roundabout/            # single-sequence example output
+│   └── all_sequences/             # all-sequence aggregation (CSV / JSON / figures)
+├── visualization/                 # plotting scripts (metric charts, flowchart)
+└── run_official_eval.py           # evaluation entry script
 ```
 
 ---
 
-### 开始编写视觉伺服模拟器
+### Reproducing the Experiments
 
-模块二（视觉伺服模拟器）以 `servo_sim.py` 的 **code stub** 形式提供：文件中已写好全部函数/类的签名、数据契约与行为说明（docstring），但函数体均为 `raise NotImplementedError`，需要按注释填充实现。下面是从零开始的完整流程。
-
-#### 1. 克隆仓库
+#### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Ichigo2315/gradient-correction.git
 cd gradient-correction
 ```
 
-#### 2. 配置环境
+#### 2. Set up the environment
 
-模块二（`servo_sim.py`）只依赖 NumPy / Matplotlib / Pillow，**不需要 PyTorch / CUDA**（梯度校正掩码已随仓库提供）：
+There are two scopes depending on how far you want to reproduce:
+
+- **Full reproduction** (re-run AOT inference + official J&F evaluation) — needs PyTorch with CUDA:
+
+```bash
+conda create -n ECE228 python=3.9 -y
+conda activate ECE228
+# install a CUDA build of PyTorch matching your GPU/driver, then:
+pip install numpy scipy matplotlib pillow pandas opencv-python tqdm scikit-image
+```
+
+> The raw DAVIS JPEG frames are required for inference; download them (see "Dataset & Project Structure") and place them under `aot-benchmark/datasets/DAVIS/JPEGImages/480p/`.
+
+- **Servo-only reproduction** (masks already shipped in the repo) — no PyTorch/CUDA needed:
 
 ```bash
 conda create -n servo python=3.9 -y
 conda activate servo
-pip install numpy matplotlib pillow
+pip install numpy scipy matplotlib pillow pandas
 ```
 
-> 若还要重跑 AOT 推理或官方 J&F 评测，则需另装 PyTorch(CUDA) 等依赖，并下载 DAVIS 原始 JPEG 帧，详见“数据集及项目结构”。
+#### 3. Generate the masks
 
-#### 3. 解压掩码（GT + 预测）
+You need three sets of masks under `aot-benchmark/`: the DAVIS Ground-Truth and the two prediction runs (AOT without GC, and AOT+GC).
 
-仓库中掩码以 zip 形式存放（PNG 数量过多），首次使用前需就地解压：
+**Option A — use the masks shipped in the repo (fast).** They are stored as zip (too many PNGs to commit raw); unzip them in place:
 
 ```powershell
 # DAVIS Ground Truth -> aot-benchmark/datasets/DAVIS/Annotations/480p/<seq>/*.png
 Expand-Archive aot-benchmark/datasets/DAVIS/Annotations.zip -DestinationPath aot-benchmark/datasets/DAVIS/
 
-# 预测掩码 -> aot-benchmark/results/davis2017/<run>/Annotations/480p/<seq>/*.png
-Expand-Archive aot-benchmark/results/davis2017/davis2017_val_noGCfull_AOTT_PRE_ckpt_unknown.zip     -DestinationPath aot-benchmark/results/davis2017/
+# Predicted masks -> aot-benchmark/results/davis2017/<run>/Annotations/480p/<seq>/*.png
+Expand-Archive aot-benchmark/results/davis2017/davis2017_val_noGCfull_AOTT_PRE_ckpt_unknown.zip      -DestinationPath aot-benchmark/results/davis2017/
 Expand-Archive aot-benchmark/results/davis2017/davis2017_val_legacy20k1full_AOTT_PRE_ckpt_unknown.zip -DestinationPath aot-benchmark/results/davis2017/
 ```
 
-（Linux/macOS 用 `unzip <zip> -d <目标目录>` 即可。）
+(On Linux/macOS use `unzip <zip> -d <target-dir>`.)
 
-#### 4. 实现 `servo_sim.py`
-
-按 stub 中的 docstring 逐个补全实现，建议顺序：
-
-1. **掩码 I/O**：`load_mask_sequence` / `extract_centroid` / `object_diag`
-2. **滤波与控制**：`KalmanCV2D`（常速卡尔曼）、`PID2D`（带饱和的离散 PID）
-3. **闭环仿真**：`simulate`（逐帧 感知 → 卡尔曼 → PID → 虚拟云台，输出 `RunLog`）
-4. **指标**：`compute_metrics`（RMSE / P99 / jerk / 控制能耗 / lock-loss 等）
-5. **驱动**：`run_single`（单序列 + 出图）、`run_all`（全序列聚合）、`build_parser` / `main`
-
-#### 5. 生成结果
-
-实现完成后运行两个子命令：
+**Option B — regenerate the masks from scratch** (requires the full environment + JPEG frames). Run inference twice, once for each method, then evaluate J&F:
 
 ```bash
-# 单序列对比（默认 GT vs AOT+GC，car-roundabout），产出 4 张图 + metrics.json
+cd aot-benchmark
+
+# AOT(ori) baseline — gradient correction disabled
+python tools/eval.py --exp_name noGCfull --stage pre --model aott \
+  --dataset davis2017 --split val \
+  --ckpt_path pretrain_models/AOTT_PRE_YTB_DAV.pth --no_gc
+
+# AOT+GC — gradient correction, every frame (K=1), 20 inner steps
+python tools/eval.py --exp_name legacy20k1full --stage pre --model aott \
+  --dataset davis2017 --split val \
+  --ckpt_path pretrain_models/AOTT_PRE_YTB_DAV.pth \
+  --gc_legacy --gc_interval 1 --gc_iter 20
+cd ..
+
+# Official DAVIS-2017 val J&F (region J + boundary F) for both runs
+python run_official_eval.py --runs noGC legacy20_k1
+```
+
+Reference numbers on DAVIS-2017 val (×100): AOT(ori) **J&F 79.29 / J 76.59 / F 81.99**; AOT+GC **J&F 79.62 / J 76.63 / F 82.60** (+0.33 J&F, mostly on boundary F). Inference speed (single GPU): AOT(ori) ≈ 57.6 FPS, AOT+GC (K=1, N=20) ≈ 1.5 FPS.
+
+#### 4. Run the visual servoing simulator
+
+`servo_sim.py` exposes two subcommands. Outputs are written under `servo_eval/`.
+
+```bash
+# Single-sequence comparison (GT vs AOT+GC, car-roundabout): 4 figures + metrics.json
 python servo_sim.py single
 
-# 全序列聚合（AOT(ori) vs AOT+GC），产出 per_sequence.csv / summary.json / summary_bar.png
+# All-sequence aggregation (AOT(ori) vs AOT+GC): per_sequence.csv / summary.json / summary_bar.png
 python servo_sim.py all
 ```
 
-输出统一写入 `servo_eval/`（`car-roundabout/` 与 `all_sequences/`）。
+> `servo_sim.py` ships as a **code stub**: every function/class signature, data contract and behaviour is documented in the docstrings, but the bodies raise `NotImplementedError`. Implement it following the docstrings (suggested order: mask I/O → Kalman/PID → closed-loop `simulate` → `compute_metrics` → `run_single` / `run_all`) before running the commands above.
 
-#### 6. 编写可视化脚本（自行发挥）
+#### 5. Produce the result charts
 
-请基于 `servo_eval/all_sequences/` 中的产物自行设计可视化脚本，例如：
+With `servo_eval/all_sequences/per_sequence.csv` in place, generate the metric comparison figures:
 
-- 输入：`servo_eval/all_sequences/per_sequence.csv`、`summary.json`、各序列 `metrics.json`
-- 可做：逐序列指标对比、AOT(ori) vs AOT+GC 胜率/箱线图、轨迹叠加动画、把质心轨迹回投到 JPEG 帧上的可视化等
-- 目标：直观呈现“梯度校正后掩码对下游物理控制的影响”，服务于最终报告
+```bash
+python visualization/visualize_servo_results.py
+```
+
+This reads `servo_eval/all_sequences/` and writes the charts (per-sequence comparison, box plots, per-sequence improvement, mean improvement, win rate, dashboard, plus `improvement_percent.csv` / `win_rate.csv` / `visualization_summary.json`) to `servo_eval/visualizations/`.
 
 ---
 
+### References
 
-### 参考文献
-
-- [1] Zongxin Yang, Yunchao Wei, and Yi Yang. "Associating Objects with Transformers for Video Object Segmentation." *Advances in Neural Information Processing Systems* (NeurIPS), 2021. [[PDF]](AOT.pdf)
-- [2] Yuxi Li, Ning Xu, Jinlong Peng, John See, and Weiyao Lin. "Delving into the Cyclic Mechanism in Semi-supervised Video Object Segmentation." *Advances in Neural Information Processing Systems* (NeurIPS), 2020. [[PDF]](cyclic%20mechanism.pdf)
+- [1] Zongxin Yang, Yunchao Wei, and Yi Yang. "Associating Objects with Transformers for Video Object Segmentation." *Advances in Neural Information Processing Systems* (NeurIPS), 2021.
+- [2] Yuxi Li, Ning Xu, Jinlong Peng, John See, and Weiyao Lin. "Delving into the Cyclic Mechanism in Semi-supervised Video Object Segmentation." *Advances in Neural Information Processing Systems* (NeurIPS), 2020.
