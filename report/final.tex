@@ -2,6 +2,7 @@
 % if you need to pass options to natbib, use, e.g.:
 %     \PassOptionsToPackage{numbers, compress}{natbib}
 % before loading neurips_2022
+\PassOptionsToPackage{numbers,compress}{natbib}
 
 
 % ready for submission
@@ -25,8 +26,10 @@
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
 \usepackage{hyperref}       % hyperlinks
 \usepackage{url}            % simple URL typesetting
+\usepackage{graphicx}       % figures
 \usepackage{booktabs}       % professional-quality tables
 \usepackage{amsfonts}       % blackboard math symbols
+\usepackage{amsmath}        % math environments
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
@@ -52,16 +55,36 @@
 \maketitle
 
 \begin{abstract}
-Provide a concise summary of your project. Your abstract should briefly describe the problem, why it is important, your main approach, key results, and the main conclusion. Note your track here. 
+% Provide a concise summary of your project. Your abstract should briefly describe the problem, why it is important, your main approach, key results, and the main conclusion. Note your track here.
+Video object segmentation (VOS) is judged almost only by per-frame overlap ($\mathcal{J}\&\mathcal{F}$), 
+which ignores the temporal consistency a downstream controller relies on. 
+We apply \emph{test-time gradient correction}~\citep{li2020cycle} to the AOT~\citep{yang2021aot} pipeline and, 
+beyond standard metrics, evaluate every mask sequence in a closed-loop visual-servoing simulator using physical metrics 
+(tracking error, control energy, centroid jerk, lock-loss). 
+On DAVIS-2017, correction does give $\mathcal{J}\&\mathcal{F}$ gain but at a large speed cost, 
+yet the servoing harness reveals stability differences the aggregate score hides.
 \end{abstract}
 
 \section{Introduction}
 
-Clearly introduce the problem your project addresses and explain why it is important. Provide enough background for readers to understand the motivation, then summarize your project goal, approach, and main contributions.
+% Clearly introduce the problem your project addresses and explain why it is important. Provide enough background for readers to understand the motivation, then summarize your project goal, approach, and main contributions.
+Semi-supervised video object segmentation (VOS)~\citep{pont2017davis} asks a model to track and segment target objects throughout a video given only a first-frame annotation. Modern memory-based models such as STM~\citep{oh2019stm} and AOT~\citep{yang2021aot} reach high accuracy and are ranked almost exclusively by the per-frame region-and-boundary score $\mathcal{J}\&\mathcal{F}$. This metric, however, rewards spatial overlap while remaining largely insensitive to \emph{temporal} behaviour: a mask whose centroid jitters frame-to-frame can score nearly identically to a temporally smooth one. For physical robotics tasks such as image-based visual servoing~\citep{chaumette2006visual}, this distinction is critical, because high-frequency perception noise propagates directly into actuator jerk, wasted control energy, and tracking lock-loss.
+
+To close the gap between perception quality and control stability, we revisit \emph{test-time gradient correction}~\citep{li2020cycle}. At inference time, this technique treats the first-frame ground truth as an anchor and performs a few gradient-descent updates on the current prediction, following the gradient of a cycle-consistency loss that propagates the mask forward and back to frame~1. We integrate this refinement into the AOT~\citep{yang2021aot} inference engine and ask a question that the VOS literature has not posed: does refining masks at test time produce a measurable improvement in downstream \emph{physical} tracking, rather than only in $\mathcal{J}\&\mathcal{F}$?
+
+Our contributions are: (i) a faithful re-implementation and audit of AOT~$+$~gradient correction on DAVIS-2017, including diagnostics that reveal why the correction signal is weak in practice and a more stable ``legacy'' variant; (ii) an open-source closed-loop visual-servoing simulator that converts any mask sequence into physically interpretable control metrics (tracking RMSE, $\mathrm{P}99$ error, control energy, centroid jerk, lock-loss); and (iii) an analysis showing that gradient correction gives only a marginal $\mathcal{J}\&\mathcal{F}$ gain ($+0.33$, mostly on boundary $\mathcal{F}$) at a large speed cost, while the servoing harness surfaces stability differences that the aggregate metric conceals.
 
 \section{Related Work}
 
-Discuss the most relevant prior work related to your project. Rather than listing papers one by one, try to organize them by themes, explain their limitations, and clearly describe how your project is related to or different from existing work.
+% Discuss the most relevant prior work related to your project. Rather than listing papers one by one, try to organize them by themes, explain their limitations, and clearly describe how your project is related to or different from existing work.
+\paragraph{Memory-based VOS architectures.}
+The dominant family for semi-supervised VOS maintains an external memory of past frame--mask pairs and retrieves it through attention-based matching. STM~\citep{oh2019stm} introduced this paradigm; AOT~\citep{yang2021aot} added an identification mechanism that segments multiple objects in a single forward pass; DeAOT~\citep{yang2022deaot} decoupled visual and identity features for hierarchical propagation; and XMem~\citep{cheng2022xmem} added a long-term memory pool for minute-long videos. All of these operate purely \emph{offline} at inference, leaving the predicted masks unrefined---precisely the gap that test-time correction targets. We build on AOT as our backbone.
+
+\paragraph{Test-time refinement and cycle consistency.}
+Online-learning methods such as OnAVOS~\citep{voigtlaender2017onavos} fine-tune network weights on the first frame; they are accurate but prohibitively slow ($<\!1$ FPS). \citet{li2020cycle} instead keep the weights fixed and use the first-frame ground-truth mask as a self-supervisory anchor, applying \emph{gradient correction}: a few PGD-style updates of the predicted mask along the gradient of a cycle-consistency loss $\mathcal{L}\bigl(S_\theta(X_t,\hat Y^{l}_t,X_1),Y_1\bigr)$. While cycle consistency is well established in image translation, \citet{li2020cycle} is, to our knowledge, the only work to use it as a test-time \emph{control signal} for VOS. Our work sits in this thread but re-examines the technique through a control-theoretic lens and reports its true accuracy--latency trade-off.
+
+\paragraph{Perception for visual servoing.}
+Classical image-based visual servoing (IBVS)~\citep{chaumette2006visual} reduces tracking control to driving a per-frame feature error to zero. Modern systems typically rely on bounding-box deep trackers rather than pixel-precise VOS, and rarely analyse how perception errors propagate into control errors. We instead use IBVS as a downstream evaluation harness for VOS masks---an angle absent from the gradient-correction literature---to quantify how mask refinement affects physical tracking stability.
 
 \section{Method / Approach}
 
@@ -77,17 +100,82 @@ Summarize the main findings of your project and reflect on what you learned. Dis
 
 \section{Code \& GitHub}
 
-Provide a link to your GitHub repository or code submission. Your repository should be well organized and include a clear README with instructions for running the code and reproducing the main results.
+All code, pretrained checkpoint, predicted masks, and evaluation scripts are available at
+\url{https://github.com/Ichigo2315/gradient-correction}.
+
+The repository is organized into the AOT inference engine with our gradient-correction module
+(\texttt{aot-benchmark/}), the official DAVIS-2017 J\&F evaluation toolkit (\texttt{davis2017-evaluation/}), the visual servoing simulator (\texttt{servo\_sim.py}), and the
+plotting scripts (\texttt{visualization/}).
+
+A README documents the full pipeline---environment setup, mask generation, running the simulator, and reproducing the
+result charts. To keep the repository lightweight, the ground-truth annotations and predicted masks are shipped as zip archives and unzipped in place, so the main results can be reproduced without re-running inference.
 
 \section{Team Member Contribution}
 
-Clearly describe each team member's contribution to the project. Please be specific about each person's role in literature review, method development, implementation, experiments, analysis, writing, and presentation.
+% Clearly describe each team member's contribution to the project. Please be specific about each person's role in literature review, method development, implementation, experiments, analysis, writing, and presentation.
+Suyu Chen was responsible for implementing and validating the gradient-correction module. He scrutinized the formulas of the original gradient-correction method and implemented it in the AOT inference engine. He also prepared the slides for presentation and completed the relevant sections in the report.
 
-\section*{Bonus: Course Evaluation Submission}
 
-We hope you enjoyed the course, and we would really appreciate you taking a moment to complete the teaching evaluation: 
-\url{https://academicaffairs.ucsd.edu/Modules/Evals/}
 
-The deadline is Saturday, June 6 at 8:00 AM. To receive the 5-point bonus, please include a screenshot of your evaluation submission in the Appendix after the “Team Member Contribution” section. You do not need to show the contents of your evaluation. The bonus will be added to your Final Project Report score, but the total report score will be capped at 80 points.
+\bibliographystyle{unsrtnat}
+{\footnotesize
+\setlength{\bibsep}{0pt plus 0.2ex}
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[Li et~al.(2020)Li, Xu, Peng, See, and Lin]{li2020cycle}
+Y.~Li, N.~Xu, J.~Peng, J.~See, and W.~Lin.
+\newblock Delving into the cyclic mechanism in semi-supervised video object segmentation.
+\newblock In \emph{NeurIPS}, 2020.
+
+\bibitem[Yang et~al.(2021)Yang, Wei, and Yang]{yang2021aot}
+Z.~Yang, Y.~Wei, and Y.~Yang.
+\newblock Associating objects with transformers for video object segmentation.
+\newblock In \emph{NeurIPS}, 2021.
+
+\bibitem[Pont-Tuset et~al.(2017)]{pont2017davis}
+J.~Pont-Tuset, F.~Perazzi, S.~Caelles, P.~Arbel\'aez, A.~Sorkine-Hornung, and L.~Van~Gool.
+\newblock The 2017 {DAVIS} challenge on video object segmentation.
+\newblock \emph{arXiv:1704.00675}, 2017.
+
+\bibitem[Oh et~al.(2019)Oh, Lee, Xu, and Kim]{oh2019stm}
+S.~W. Oh, J.-Y. Lee, N.~Xu, and S.~J. Kim.
+\newblock Video object segmentation using space-time memory networks.
+\newblock In \emph{ICCV}, 2019.
+
+\bibitem[Chaumette and Hutchinson(2006)]{chaumette2006visual}
+F.~Chaumette and S.~Hutchinson.
+\newblock Visual servo control. {I}. {B}asic approaches.
+\newblock \emph{IEEE Robotics \& Automation Magazine}, 13(4):82--90, 2006.
+
+\bibitem[Yang and Yang(2022)]{yang2022deaot}
+Z.~Yang and Y.~Yang.
+\newblock Decoupling features in hierarchical propagation for video object segmentation.
+\newblock In \emph{NeurIPS}, 2022.
+
+\bibitem[Cheng and Schwing(2022)]{cheng2022xmem}
+H.~K. Cheng and A.~G. Schwing.
+\newblock {XM}em: Long-term video object segmentation with an {A}tkinson--{S}hiffrin memory model.
+\newblock In \emph{ECCV}, 2022.
+
+\bibitem[Voigtlaender and Leibe(2017)]{voigtlaender2017onavos}
+P.~Voigtlaender and B.~Leibe.
+\newblock Online adaptation of convolutional neural networks for video object segmentation.
+\newblock In \emph{BMVC}, 2017.
+
+\end{thebibliography}
+}
+
+\section*{Appendix}
+
+\subsection{Course Evaluation Submission}
+
+% The deadline is Saturday, June 6 at 8:00 AM. To receive the 5-point bonus, please include a screenshot of your evaluation submission in the Appendix after the “Team Member Contribution” section. You do not need to show the contents of your evaluation. The bonus will be added to your Final Project Report score, but the total report score will be capped at 80 points.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{{Course Evaluation Submission}.png}
+  \label{fig:course-eval}
+\end{figure}
 
 \end{document}
