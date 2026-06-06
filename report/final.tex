@@ -90,6 +90,79 @@ Classical image-based visual servoing (IBVS)~\citep{chaumette2006visual} reduces
 
 Describe your proposed method or approach in detail. Include the problem formulation, model architecture, algorithms, equations, or technical design when appropriate, and explain why your approach is suitable for the problem.
 
+\subsection{Visual-Servoing Simulator}
+
+After obtaining a refined model, we need to verify whether the refinement improves a physically meaningful
+ downstream task, not only the standard $\mathcal{J}\&\mathcal{F}$ scores. For this purpose, we build a 
+ lightweight image-based visual-servoing simulator. The simulator treats each predicted mask sequence 
+ as the perception module of a closed-loop tracking system: the mask provides the object position, a 
+ state estimator smooths the noisy observation, and a virtual pan--tilt camera is controlled to keep 
+ the object centered. This design is suitable for our problem because temporal mask jitter, missing masks,
+  and small centroid shifts are converted into control metrics such as tracking error, control effort, 
+  and centroid jerk.
+
+The input to the simulator is a DAVIS-style indexed PNG mask sequence, where pixel value $0$ denotes 
+background and positive integer values denote object IDs. For each frame $t$, we extract the centroid 
+observation
+\[
+z_t = (c_x, c_y) =
+\left(\frac{1}{|\Omega_t|}\sum_{(x,y)\in\Omega_t} x,\;
+\frac{1}{|\Omega_t|}\sum_{(x,y)\in\Omega_t} y\right),
+\quad
+\Omega_t=\{(x,y): M_t(x,y)=\texttt{obj\_id}\}.
+\]
+If the object is absent, the observation is marked as missing and the estimator performs prediction only. 
+The estimator is a constant-velocity Kalman filter with state
+\[
+x_t = [c_x,\; c_y,\; v_x,\; v_y]^\top,
+\]
+which reduces high-frequency centroid noise while preserving object motion. The virtual camera position, 
+denoted by $p_t$, follows the filtered centroid using a discrete PID controller. At each frame, the 
+control error is
+\[
+e_t = \hat{x}_{t,1:2} - p_t,
+\]
+and the command is
+\[
+u_t = K_p e_t + K_i \sum_{\tau \leq t} e_\tau \Delta t
+      + K_d \frac{e_t-e_{t-1}}{\Delta t},
+\qquad
+p_{t+1}=p_t+u_t\Delta t.
+\]
+Our visual-servoing evaluation pipeline is shown in Figure \ref{fig:servo-flow}. In our experiments, we 
+use the default DAVIS frame rate of $24$ FPS, a constant-velocity Kalman model, and PID gains 
+$(K_p,K_i,K_d)=(0.45,0,0.05)$.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.8\linewidth]{servo_flow.png}
+  \caption{Visual-servoing evaluation pipeline.}
+  \label{fig:servo-flow}
+\end{figure}
+
+The core simulation loop can be summarized as:
+\[
+\begin{array}{ll}
+\textbf{Input:} & \text{mask sequence } \{M_t\}_{t=1}^{T},\; \text{object id},\; \Delta t \\
+\textbf{Initialize:} & z_1 \leftarrow \text{first available centroid},\quad
+                     \hat{x}_1 \leftarrow [z_1,0,0],\quad p_1 \leftarrow z_1 \\
+\textbf{For } t=1,\ldots,T: &
+  z_t \leftarrow \text{centroid}(M_t,\text{object id}) \\
+& \hat{x}_t \leftarrow \text{KalmanPredictUpdate}(z_t) \\
+& e_t \leftarrow \hat{x}_{t,1:2}-p_t \\
+& u_t \leftarrow \text{PID}(e_t) \\
+& p_{t+1} \leftarrow p_t + u_t\Delta t \\
+& \text{log } z_t,\hat{x}_t,e_t,u_t,p_t
+\end{array}
+\]
+
+In the process, the script reports tracking RMSE, 99th-percentile tracking error, normalized 
+tracking error, total control energy, centroid jerk RMS, lock-loss frames, 
+and missing-frame counts. The \texttt{single} mode compares arbitrary mask sources on one sequence and 
+saves diagnostic plots, while the \texttt{all} mode aggregates AOT and AOT+GC over the DAVIS-2017 
+validation set into \texttt{per\_sequence.csv}, \texttt{summary.json}, and summary figures. The detailed 
+visualizations and numerical results are presented in the next section.
+
 \section{Results \& Analysis}
 
 Present your experimental results clearly using tables, figures, and/or qualitative examples. Include sufficient implementation details, such as datasets, preprocessing, train/test splits, baselines, evaluation metrics, and hyperparameters, so that your results are reproducible. Analyze the results carefully and explain what they demonstrate about your method.
@@ -114,6 +187,9 @@ result charts. To keep the repository lightweight, the ground-truth annotations 
 
 % Clearly describe each team member's contribution to the project. Please be specific about each person's role in literature review, method development, implementation, experiments, analysis, writing, and presentation.
 Suyu Chen was responsible for implementing and validating the gradient-correction module. He scrutinized the formulas of the original gradient-correction method and implemented it in the AOT inference engine. He also prepared the slides for presentation and completed the relevant sections in the report.
+
+Yi Sun was responsible for the visual-servoing simulator part. He built the simulator to evaluate the 
+downstream task performance of refined VOS masks and completed the relevant section in the report.
 
 
 
