@@ -24,6 +24,9 @@ report/*.aux
 report/*.pdf
 report/*.log
 report/*.out
+report/*.gz
+report/*.fls
+report/*.fdb_latexmk
 
 # ===========================================================================
 # DAVIS-2017 dataset
