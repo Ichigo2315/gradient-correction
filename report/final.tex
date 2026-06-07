@@ -88,7 +88,57 @@ Classical image-based visual servoing (IBVS)~\citep{chaumette2006visual} reduces
 
 \section{Method / Approach}
 
-Describe your proposed method or approach in detail. Include the problem formulation, model architecture, algorithms, equations, or technical design when appropriate, and explain why your approach is suitable for the problem.
+% Describe your proposed method or approach in detail. Include the problem formulation, model architecture, algorithms, equations, or technical design when appropriate, and explain why your approach is suitable for the problem.
+
+\subsection{Gradient Correction}
+
+Our backbone is AOT~\citep{yang2021aot}, a memory-based VOS model that, given the first frame $X_1$ and
+its ground-truth mask $Y_1$, propagates the target to every later frame $X_t$ by matching against a
+memory of past frame--mask pairs. Like all such models, AOT runs purely feed-forward at inference, so a
+prediction error at frame $t$ is never corrected and tends to accumulate over time. Gradient
+correction~\citep{li2020cycle} addresses this by treating the first-frame ground truth as a
+self-supervisory anchor and refining the current prediction at test time, while keeping the network
+weights $\theta$ frozen.
+
+The key idea is a \emph{cycle}: if a predicted mask $\hat{Y}_t$ for frame $t$ is correct, then using
+$(X_t,\hat{Y}_t)$ as a reference to segment the \emph{first} frame $X_1$ should reproduce the known
+ground truth $Y_1$. We therefore feed the current frame back into the same (frozen) segmentation network
+$S_\theta$ as a reference, with the soft prediction $\hat{Y}_t$ as its reference mask, and predict the
+first frame; the discrepancy with $Y_1$ measures how self-consistent $\hat{Y}_t$ is. Minimizing this
+discrepancy with respect to the mask itself yields the gradient-correction update (Eq.~(5) of
+\citet{li2020cycle}):
+\[
+\hat{Y}_t^{(l+1)} \;=\; \operatorname{proj}_{\Delta}\!\left(
+\hat{Y}_t^{(l)} \;-\; \alpha\,
+\frac{\partial\, \mathcal{L}\!\left(\mathcal{G}\!\left(\mathcal{F}(\hat{Y}_t^{(l)})\right),\, Y_1\right)}
+{\partial\, \hat{Y}_t^{(l)}}
+\right),
+\qquad l = 0,\ldots,N-1,
+\]
+where $\mathcal{F}$ propagates the soft mask $\hat{Y}_t^{(l)}$ from frame $t$ forward, $\mathcal{G}$
+maps it back onto the first frame to form the cyclic reconstruction
+$\mathcal{G}(\mathcal{F}(\hat{Y}_t^{(l)}))=S_\theta(X_t,\hat{Y}_t^{(l)},X_1)$, $\alpha$ is the step size,
+and $\operatorname{proj}_{\Delta}$ projects each pixel back onto the probability simplex so that the mask
+stays a valid soft one-hot distribution over object IDs. The mask is kept as a soft distribution throughout, which makes
+the whole cycle differentiable so the gradient can flow back to $\hat{Y}_t^{(l)}$.
+
+The cyclic loss $\mathcal{L}$ compares the reconstructed first frame against the true first-frame mask
+$Y_1$ and combines a cross-entropy term with a soft-IoU term,
+\[
+\mathcal{L} = \tfrac{1}{2}\,\mathcal{L}_{\mathrm{CE}}\!\left(\hat{Y}_1, Y_1\right)
+            + \tfrac{1}{2}\left(1 - \mathrm{IoU}_{\text{soft}}\!\left(\hat{Y}_1, Y_1\right)\right),
+\qquad \hat{Y}_1 = \mathcal{G}\!\left(\mathcal{F}(\hat{Y}_t^{(l)})\right),
+\]
+where the cross-entropy enforces correct per-pixel ID assignment and the soft-IoU term directly rewards
+region overlap. After $N$ inner steps the corrected mask $\hat{Y}_t^{(N)}$ replaces the raw prediction
+and is written into AOT's memory, so the refinement also benefits the propagation of subsequent frames.
+
+Our implementation has three hyperparameters: the correction interval $K$ (apply the
+update every $K$ frames), the number of inner steps $N$, and the step size $\alpha$. We found that a
+faithful, end-to-end differentiable cycle produces very small gradients ($\lVert g\rVert\!\sim\!10^{-3}$),
+so a single conservative step barely moves the mask, whereas a large $\alpha$ overshoots and degrades
+easy sequences. We correct \emph{every} frame ($K{=}1$) with $N{=}20$ inner steps; the simplex projection keeps each update bounded. This setting gives
+the best $\mathcal{J}\&\mathcal{F}$ on DAVIS-2017 val among the configurations we swept, at the cost of a substantially lower inference speed.
 
 \subsection{Visual-Servoing Simulator}
 
@@ -135,7 +185,7 @@ $(K_p,K_i,K_d)=(0.45,0,0.05)$.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.8\linewidth]{servo_flow.png}
+  \includegraphics[width=0.6\linewidth]{figs/servo_flow.png}
   \caption{Visual-servoing evaluation pipeline.}
   \label{fig:servo-flow}
 \end{figure}
@@ -250,7 +300,7 @@ P.~Voigtlaender and B.~Leibe.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\linewidth]{{Course Evaluation Submission}.png}
+  \includegraphics[width=\linewidth]{{figs/Course Evaluation Submission}.png}
   \label{fig:course-eval}
 \end{figure}
 
