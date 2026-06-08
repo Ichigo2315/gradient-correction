@@ -215,11 +215,115 @@ visualizations and numerical results are presented in the next section.
 
 \section{Results \& Analysis}
 
-Present your experimental results clearly using tables, figures, and/or qualitative examples. Include sufficient implementation details, such as datasets, preprocessing, train/test splits, baselines, evaluation metrics, and hyperparameters, so that your results are reproducible. Analyze the results carefully and explain what they demonstrate about your method.
+We evaluate AOT+GC against the original AOT output on the DAVIS-2017 validation sequences using the
+visual-servoing simulator described above. For each sequence, the simulator tracks the selected object
+centroid from the indexed mask sequence and reports downstream control metrics. Since lower values are
+better for all metrics in this section, a positive improvement means that AOT+GC produced a lower value
+than AOT(ori). The main takeaway is conservative: gradient correction produces only very small average
+changes, but it tends to move tracking error and control effort in the right direction on more sequences
+than it hurts.
+
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+    Metric & AOT(ori) mean & AOT+GC mean & AOT+GC win / tie / loss \\
+    \midrule
+    Tracking RMSE (px) & 89.218 & 89.196 & 20 / 5 / 5 \\
+    Tracking P99 (px) & 156.611 & 156.553 & 20 / 3 / 7 \\
+    Control energy & 3310.291 & 3309.868 & 19 / 6 / 5 \\
+    Centroid jerk RMS & 11590.960 & 11591.217 & 15 / 1 / 14 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Visual-servoing metrics on the 30 evaluated DAVIS-2017 validation sequences.}
+  \label{tab:servo-results}
+\end{table}
+
+Table~\ref{tab:servo-results} shows that the aggregate means are almost unchanged. AOT+GC slightly
+reduces tracking RMSE, 99th-percentile tracking error, and control energy, but the relative gains are
+only about $0.02\%$. Centroid jerk RMS is even less stable: the per-sequence average improvement is
+close to zero, while the aggregate mean is slightly worse for AOT+GC. This suggests that test-time
+correction does not reliably smooth the centroid trajectory, even when it improves the object position
+used by the controller.
+
+\begin{figure}[h]
+  \centering
+  \begin{minipage}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figs/win_rate_bar.png}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figs/mean_improvement_bar.png}
+  \end{minipage}
+  \caption{Left: percentage of sequences where AOT+GC outperforms AOT(ori). Right: mean per-sequence
+  improvement. The win-rate plot is more informative than raw mean differences because the average
+  improvements are extremely small.}
+  \label{fig:servo-win-mean}
+\end{figure}
+
+Figure~\ref{fig:servo-win-mean} clarifies the difference between magnitude and consistency. AOT+GC wins
+on $76.67\%$ of sequences for tracking RMSE, $66.67\%$ for tracking P99, and $83.33\%$ for control
+energy. These win rates indicate a mild positive downstream effect, especially for the controller's
+energy use. However, the average improvement bars remain close to zero, so the method should not be
+described as producing a large control improvement. Missing frames and missing rate are unchanged: only
+the \texttt{india} sequence has missing detections, and both methods miss the same 13 of 81 frames.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figs/improvement_by_sequence_tracking_rmse_px.png}
+  \caption{Per-sequence improvement in tracking RMSE. AOT+GC helps on many sequences, but most changes
+  are very small; the visible gain is dominated by a few sequences such as \texttt{kite-surf}.}
+  \label{fig:improvement-rmse}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figs/improvement_by_sequence_tracking_p99_px.png}
+  \caption{Per-sequence improvement in 99th-percentile tracking error. The pattern is sequence-dependent:
+  several sequences improve, several degrade slightly, and most remain near zero.}
+  \label{fig:improvement-p99}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figs/improvement_by_sequence_control_energy.png}
+  \caption{Per-sequence improvement in control energy. The controller benefits on most sequences, but the
+  absolute improvement remains modest and a small number of sequences become slightly worse.}
+  \label{fig:improvement-energy}
+\end{figure}
+
+The per-sequence improvement plots support a sequence-dependent interpretation. Some videos receive a
+clearer downstream benefit from correction, while most videos have nearly identical AOT(ori) and AOT+GC
+servoing behavior and a few are slightly worse. This is why we did not include raw metric-comparison
+figures whose axes mix very different scales: tracking error would be visually compressed by larger
+jerk and control-energy values. We also omit missing-frame boxplots because almost all values are zero
+and they do not add meaningful evidence. Overall, the visual-servoing simulator complements standard
+DAVIS $\mathcal{J}\&\mathcal{F}$ evaluation by exposing downstream control stability, even when the mask
+quality differences are too small to be visually obvious in ordinary VOS metrics.
 
 \section{Conclusion}
 
-Summarize the main findings of your project and reflect on what you learned. Discuss the limitations of your current work and suggest meaningful future directions.
+This project integrates test-time gradient correction into the AOT video object segmentation pipeline
+and evaluates the refined masks from both perception and downstream-control perspectives. In addition
+to the standard DAVIS $\mathcal{J}\&\mathcal{F}$ score, we built and used a visual-servoing simulator to
+measure tracking error, tail error, control energy, centroid jerk, and missing-frame behavior. This
+second evaluation view is useful because temporally small mask changes can affect controller stability
+even when aggregate VOS metrics look almost unchanged.
+
+The final results are mixed but informative. AOT+GC gives only limited average improvement, yet it
+slightly improves tracking error and control energy on a majority of evaluated sequences. The centroid
+jerk result is not stable, and missing-frame behavior is essentially unchanged. These findings suggest
+that gradient correction can be directionally helpful for downstream servoing, but the current version is
+not strong or consistent enough to claim a large practical gain.
+
+The main limitations are the high inference cost of test-time optimization, the very small average
+improvement, unstable behavior across sequences, and visualizations that are still mostly metric-level
+rather than trajectory-level. Future work should investigate selective correction only on uncertain
+frames, adaptive step sizes, stronger temporal-consistency losses, trajectory-overlay or JPEG-projection
+visualizations, and more realistic camera dynamics in the simulator.
 
 \section{Code \& GitHub}
 
@@ -240,6 +344,8 @@ Suyu Chen was responsible for implementing and validating the gradient-correctio
 
 Yi Sun was responsible for the visual-servoing simulator part. He built the simulator to evaluate the 
 downstream task performance of refined VOS masks and completed the relevant section in the report.
+
+Yinru Chen was responsible for the visualization and result-analysis part. He generated the visual-servoing result figures and completed the corresponding analysis in the report.
 
 
 
